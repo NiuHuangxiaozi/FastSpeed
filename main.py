@@ -87,10 +87,7 @@ def train(args, train_data):
 
     model.train()
     for epoch in range(args.epochs):  # loop over the dataset multiple times
-
-
         running_loss = 0.0
-
         train_loader.sampler.set_epoch(epoch)
         if args.local_rank == 0:
             start_time = time.time()

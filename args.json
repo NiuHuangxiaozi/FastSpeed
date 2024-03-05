@@ -1,11 +1,13 @@
 {
   "epochs":10,
+  "learning_rate": 0.001,
   "log_interval": 50,
-  "gradient_step":10,
-  "data_path": "./data/",
+  "gradient_accumulate_step":10,
+  "data_path": "/home/",
   "data_partition_method":  "manual",
   "manual_partition_lists": [25000, 25000],
   "batch_size": [40, 40],
   "train_loader_pin_memory": 0,
-  "train_loader_num_workers": 6
+  "train_loader_num_workers": 6,
+  "model_parallelism": "ddp"
 }
