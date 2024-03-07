@@ -1,13 +1,21 @@
 {
   "epochs":10,
+  "batch_size": 60,
   "learning_rate": 0.001,
   "log_interval": 50,
   "gradient_accumulate_step":10,
   "data_path": "/home/",
-  "data_partition_method":  "manual",
-  "manual_partition_lists": [25000, 25000],
-  "batch_size": [40, 40],
+  "model_type": "ddp",
+
+  "partition_method":  "autobalanced",
+  "manual_partition_list": [25000, 25000],
+  "manual_batchsize_list": [40, 40],
+
+  "total_datasize": 50000,
+  "data_dummy_shape": [1,3,449,449],
+  "unbalanced_strategy": "time",
+
+
   "train_loader_pin_memory": 0,
-  "train_loader_num_workers": 6,
-  "model_parallelism": "ddp"
+  "train_loader_num_workers": 4
 }
