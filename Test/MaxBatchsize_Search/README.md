@@ -47,7 +47,7 @@ Data文件结构：
 
 Config文件结构:
 
-![Config](C:\D\Lesson\Bert\MaxBatchsize_Search\Config\Config.png)
+![Config](./Config/Config.png)
 
 相应的模型权重和数据集下载地址：
 
