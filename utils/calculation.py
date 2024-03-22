@@ -1,16 +1,27 @@
 import torch
+import torch.nn as nn
 import time
 import torch.optim as optim
 from thop import profile
 __all__ = ["calculate_time", "calculate_memmory","calculate_param"]
 
 
+def Get_LossFunction(name:str):
+    if name=='CrossEntropy':
+        return nn.CrossEntropyLoss()
+
 #try to calculate the time
-def calculate_time(model,criterion,device,shape:tuple):
+def calculate_time(model,criterion_name:str,device,shape:tuple):
 
     #create a temporary tensor
+    temp_tensor = torch.normal(0, 1, size=shape).to(device)
+
+    #model
     model = model.to(device)
-    temp_tensor=torch.normal(0, 1, size=shape).to(device)
+
+    #loss函数
+    criterion=Get_LossFunction(criterion_name)
+
     torch.cuda.synchronize()
     start = time.time()
     result=model(temp_tensor)
@@ -20,6 +31,8 @@ def calculate_time(model,criterion,device,shape:tuple):
     end = time.time()
     time_cost=end-start
     return time_cost
+
+
 
 
 
