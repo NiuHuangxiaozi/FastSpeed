@@ -1,20 +1,25 @@
 {
-  "epochs":4,
-  "batch_size": 60,
-  "learning_rate": 0.001,
-  "iter_log_interval": 50,
-  "epoch_log_interval": 1,
-  "gradient_accumulate_step":10,
-  "data_path": "/home/",
-  "model_type": "ddp",
-
-  "partition_method":  "autobalanced",
-  "manual_partition_list": [25000, 25000],
-  "manual_batchsize_list": [40, 40],
-
-  "total_datasize": 50000,
-  "data_dummy_shape": [1,3,449,449],
-  "unbalanced_strategy": "time",
-  "train_loader_pin_memory": 0,
-  "train_loader_num_workers": 4
+  "data": {
+    "total_datasize": 50000,
+    "data_dummy_shape": [100,3,449,449],
+    "train_loader_pin_memory": 0,
+    "train_loader_num_workers": 4
+  },
+  "train":{
+      "epochs":1,
+      "batch_size": 60,
+      "iter_log_interval": 50,
+      "epoch_log_interval": 1,
+      "gradient_accumulate_step":10,
+      "criterion": "CrossEntropy",
+      "optimizer":"Adam",
+      "learning_rate": 0.001
+  },
+  "strategy": {
+      "model_type": "ddp",
+      "unbalanced_strategy": "time",
+      "partition_type":  "manual",
+      "manual_partition_list": [25000, 25000],
+      "manual_batchsize_list": [30, 30]
+  }
 }
