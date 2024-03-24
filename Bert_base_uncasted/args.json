@@ -1,0 +1,25 @@
+{
+  "data": {
+    "total_datasize": 50000,
+    "train_loader_pin_memory": 0,
+    "train_loader_num_workers": 4
+  },
+  "train":{
+      "epochs":1,
+      "batch_size": 10,
+      "iter_log_interval": 50,
+      "epoch_log_interval": 1,
+      "gradient_accumulate_step":10,
+      "criterion": "CrossEntropy",
+      "optimizer":"Adam",
+      "learning_rate": 0.001
+  },
+  "strategy": {
+      "model_type": "ddp",
+      "unbalanced_strategy": "time",
+      "test_batchsize_bytime":10,
+      "partition_type":  "manual",
+      "manual_partition_list": [25000, 25000],
+      "manual_batchsize_list": [5, 5]
+  }
+}
