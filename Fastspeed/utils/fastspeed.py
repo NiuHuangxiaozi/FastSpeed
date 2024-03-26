@@ -162,9 +162,10 @@ class FastSpeed:
         # else:
         #     max_batchsize_list = [0 for _ in range(self.dist_args.world_size)]
         #     dist.gather(MaxBatchsize_Tensor, dst=0)
+        ################################################################################################################
+        max_batchsize=-1
 
         device = self.dist_args.local_rank
-
         file_path = "./Fastspeed/Temp/template.py"
         target_file_path = "./Fastspeed/Temp/instance.py"
         data = None
@@ -178,18 +179,49 @@ class FastSpeed:
             "#__CEILING_BATCHSIZE__#": str(self.config.train["batch_size"]),
             "#__TEMPSAMPLE_PATH__#": "./Fastspeed/Temp/" + self.config.strategy["model_name"] + "_testsample.pt"
         }
-        with (open(file_path, 'r', encoding='utf-8') as f):
-            data = f.read()
-            data = data.replace("#__Dependency__#", list2str(dependency_list))
-            data = repalce_macro(data, macros)
-
-        with open(target_file_path, 'w', encoding='utf-8') as f:
-            f.write(data)
-
         cmd = ["python", target_file_path]
-        result = subprocess.run(cmd, stdout=subprocess.PIPE)
-        max_batchsize = int(result.stdout.decode('utf-8'))
+        left, right = 1, self.config.train["batch_size"]
+        while left <= right:
+            mid = (right - left) // 2 + left
+            #-----------------------------------------------------------------------------------------------------------
+            macros["#__CEILING_BATCHSIZE__#"] = str(mid)
+            with (open(file_path, 'r', encoding='utf-8') as f):
+                data = f.read()
+                data = data.replace("#__Dependency__#", list2str(dependency_list))
+                data = repalce_macro(data, macros)
+
+            with open(target_file_path, 'w', encoding='utf-8') as f:
+                f.write(data)
+
+            #等待所有的cuda任务全部执行完
+            torch.cuda.synchronize()
+
+            result = subprocess.run(cmd, stdout=subprocess.PIPE)
+            flag = int(result.stdout.decode('utf-8'))
+            print("The omm detection is ", flag)
+
+            #-----------------------------------------------------------------------------------------------------------
+            if left == right:
+                if flag:
+                    max_batchsize=mid - 1
+                else:
+                    max_batchsize = mid
+                break
+            elif left + 1 == right:
+                if flag:
+                    max_batchsize = mid - 1
+                    break
+                else:
+                    left = mid + 1
+            else:
+                if flag:
+                    right = mid - 1
+                else:
+                    left = mid + 1
+
+        assert(max_batchsize!=-1)
         print("The max batchsize is ", max_batchsize)
+        # --------------------------------------------------------------------------------------------------------------
 
         # gather_list用于收集所有的max_batchsize
         MaxBatchsize_Tensor = torch.IntTensor([max_batchsize]).to(device)

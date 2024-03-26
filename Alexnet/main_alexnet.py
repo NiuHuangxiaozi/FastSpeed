@@ -10,6 +10,9 @@ import torch.distributed as dist
 import torchvision
 import torch.optim as optim
 import torch.nn as nn
+from tqdm import  tqdm
+from torch.utils.data import DataLoader
+
 # my lib
 from  Fastspeed.utils.utilstool import Params
 from Fastspeed.utils.fastspeed import FastSpeed
@@ -77,7 +80,7 @@ def Task(
     #获取数据集和用于负载均衡的小样例
     train_dataset, test_dataset = get_dataset(args.local_rank, "/home/")
     input=train_dataset[0][0].unsqueeze(0)
-    label=torch.Tensor([train_dataset[0][1]])
+    label=torch.LongTensor([train_dataset[0][1]])
     # 定义模型
     task_model = AlexNet(10)
 
@@ -96,8 +99,42 @@ def Task(
     trained_model,epoch_loss_list=train_platform.train(train_loader=train_loader,
                                                 wrapped_model=wrapped_model)
 
-    print("epoch_loss_list is",epoch_loss_list)
+    print("epoch_loss_list is", epoch_loss_list)
     print('Global Rank %d finished training' % (args.global_rank))
+    ###################################################################################################################
+    test_dataloader = DataLoader(dataset=test_dataset,
+                              batch_size=16,
+                              shuffle=True,
+                              num_workers=2
+                              )
+
+    print("Begin to test the acc and loss for Alexnet on cifar10 dataset!")
+    total_acc_test = 0
+    total_loss_test = 0
+    trained_model.eval()
+    # 不需要计算梯度
+    with torch.no_grad():
+        # 循环获取数据集，并用训练好的模型进行验证
+        for test_input, test_label in tqdm(test_dataloader):
+            # 如果有GPU，则使用GPU，接下来的操作同训练
+            test_input = test_input.to(args.local_rank)
+            test_label = test_label.to(args.local_rank)
+            output = wrapped_model(test_input)
+
+            batch_loss = nn.CrossEntropyLoss()(output, test_label)
+            total_loss_test += batch_loss.item()
+
+            acc = (output.argmax(dim=1) == test_label).sum().item()
+            total_acc_test += acc
+
+    print(
+        f'''| Val Loss: {total_loss_test / len(test_dataset): .3f} 
+            | Val Accuracy: {total_acc_test / len(test_dataset): .3f}''')
+
+    print('Global Rank %d finished testing' % (args.global_rank))
+
+
+
 
 # /////////////////////////////////////////////////////////////////
 if __name__ == '__main__':

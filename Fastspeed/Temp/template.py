@@ -1,11 +1,9 @@
 import sys
-import os
 import torch
 import torch.nn as nn
-from torch.optim import Adam,SGD
+from torch.optim import Adam
 from typing import List
-
-
+import copy
 
 class Test_max_batchsize:
     def __init__(self,model,optimizer_name:str,criterion_name:str,device):
@@ -42,23 +40,22 @@ class Test_max_batchsize:
             print("Error in Test_max_batchsize _construct_criterion: wrong loss function!")
             sys.exit(1)
 
-    def is_oom(self,batchsize):
+    def is_oom(self,batchsize)->int:
         try:
             #input
             if isinstance(self.input, dict):
                 batchsized_input={}
                 for key in self.input:
                     item=self.input[key]
-                    batchsized_input[key]=item.clone().detach().repeat(self._repeat_size(item.shape,batchsize)).to(self.device)
-
+                    batchsized_input[key]=copy.deepcopy(item).repeat(self._repeat_size(item.shape,batchsize)).to(self.device)
             elif isinstance(self.input, torch.Tensor):
-                    batchsized_input=self.input.clone().detach().repeat(self._repeat_size(self.input.shape,batchsize)).to(self.device)
+                    batchsized_input=copy.deepcopy(self.input).repeat(self._repeat_size(self.input.shape,batchsize)).to(self.device)
             else:
                 raise  TypeError("self.input must be torch.Tensor or a torch.Tensor dict!")
 
             #label
             if isinstance(self.label, torch.Tensor):
-                 batchsized_label=self.label.clone().detach().repeat(self._repeat_size(self.label.shape,batchsize)).to(self.device)
+                 batchsized_label=copy.deepcopy(self.label).repeat(self._repeat_size(self.label.shape,batchsize)).to(self.device)
             else:
                 raise TypeError("self.label must be torch.Tensor type!")
 
@@ -92,40 +89,13 @@ class Test_max_batchsize:
             del batchsized_label
             del batch_loss
             torch.cuda.empty_cache()
-            return False
+            return 0
         except RuntimeError as exception:
                 if "out of memory" in str(exception):
-                        return True
+                        return 1
 
 
-    def search_max_batchsize(self,max_batchsize:int)->int:
-        left, right = 1,max_batchsize
-        while left <= right:
-            mid = (right - left) // 2 + left
-            flag=self.is_oom(mid)
-            torch.cuda.synchronize(self.device)
-            if left ==right:
-                if flag:
-                    return mid-1
-                else:
-                    return mid
-            elif left+1 ==right:
-                if flag:
-                    return mid-1
-                else:
-                    left=mid+1
-            else:
-                if flag:
-                    right=mid-1
-                else:
-                    left=mid+1
-        assert(False)
-        return 0;
-
-
-
-########################################################################################################################
-##do not delete the following comments
+import os
 sys.path.append(os.getcwd())
 #__Dependency__#
 
@@ -138,25 +108,29 @@ DEVICE=#__DEVICE__#
 CEILING_BATCHSIZE=#__CEILING_BATCHSIZE__#
 TEMPSAMPLE_PATH="#__TEMPSAMPLE_PATH__#"
 
-########################################################################################################################
+
+
 
 def main():
-    model=#__MODEL_NAME__#(#__MODEL_ARGS__#)
-    optimizer_name=OPTIMIZER_NAME
-    criterion_name=CRITERION_NAME
-    device=DEVICE
-    test_platform=Test_max_batchsize(model,optimizer_name,criterion_name,device)
+    # 准备训练平台的一些参数
+    model =#__MODEL_NAME__#(#__MODEL_ARGS__#)
+    optimizer_name = OPTIMIZER_NAME
+    criterion_name = CRITERION_NAME
+    device = DEVICE
+
+
+    test_platform = Test_max_batchsize(model, optimizer_name, criterion_name, device)
 
     # 准备数据
-    input_and_label=torch.load(TEMPSAMPLE_PATH)
-    one_input=input_and_label["input"]
-    one_label=input_and_label["label"]
+    input_and_label = torch.load(TEMPSAMPLE_PATH)
+    one_input = input_and_label["input"]
+    one_label = input_and_label["label"]
 
     test_platform.setInputData(one_input)
     test_platform.setLabel(one_label)
-    max_batchsize = test_platform.search_max_batchsize(CEILING_BATCHSIZE)
-    print(max_batchsize,end='')
 
+    flag = test_platform.is_oom(CEILING_BATCHSIZE)
+    print(flag)
 
-if __name__=="__main__":
+if __name__=='__main__':
     main()
