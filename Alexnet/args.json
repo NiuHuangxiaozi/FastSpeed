@@ -1,0 +1,30 @@
+{
+  "data": {
+    "total_datasize": 37512,
+    "train_loader_pin_memory": 0,
+    "train_loader_num_workers": 4
+  },
+  "train":{
+      "epochs":1,
+      "batch_size": 62,
+      "iter_log_interval": 50,
+      "epoch_log_interval": 1,
+      "gradient_accumulate_step":20,
+      "criterion": "CrossEntropy",
+      "optimizer":"Adam",
+      "learning_rate": 0.001
+  },
+  "strategy": {
+      "model_type": "ddp",
+      "partition_type":  "autobalanced",
+      "manual_partition_list": [18756, 18756],
+      "manual_batchsize_list": [5, 5],
+
+      "unbalanced_strategy": "time",
+      "test_batchsize_bytime":10,
+      "model_name": "BertClassifier",
+      "model_args": ["./Config"],
+      "runing_dependency":["from model import * "],
+      "work_path":"/home/"
+  }
+}
