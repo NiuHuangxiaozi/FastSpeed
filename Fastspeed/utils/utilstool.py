@@ -59,6 +59,18 @@ def repeat_obj(input,multiplyer):
         sys.exit(1)
 
 
+def list2str(s:List[str])->str:
+    result=""
+    for item in s:
+        result+=(item+'\n')
+    return result
+
+
+
+def repalce_macro(data:str,d:dict)->str:
+    for initial_value in d:
+        data=data.replace(initial_value,d[initial_value])
+    return data
 
 #utilstool.py内部使用的函数
 ########################################################################################################################

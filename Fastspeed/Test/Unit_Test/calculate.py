@@ -7,10 +7,9 @@ sys.path.append('C:\\D\\Lesson\\Final_Design\\')
 import torch.nn as nn
 import torch.optim as optim
 from thop import profile
-from ptflops import get_model_complexity_info
 
 # my party
-from model import AlexNet
+from Fastspeed.Test.MaxBatchsize_Search_Newshell.model import AlexNet
 
 ########################################################################################################################
 # the codes are going to be tested

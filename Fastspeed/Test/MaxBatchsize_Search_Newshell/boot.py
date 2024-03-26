@@ -29,7 +29,7 @@ def repalce_macro(data:str,d:dict)->str:
     return data
 def main():
     file_path= "template.py"
-    target_file_path="instance.py"
+    target_file_path= "instance.py"
     data=None
 
 

@@ -99,7 +99,6 @@ class Test_max_batchsize:
                         torch.cuda.empty_cache()
                         return True
 
-
     def search_max_batchsize(self,max_batchsize:int)->int:
         left, right = 1,max_batchsize
         while left <= right:
@@ -128,7 +127,7 @@ class Test_max_batchsize:
 ########################################################################################################################
 ##do not delete the following comments
 
-from model import *
+from  model import *
 
 
 
@@ -138,7 +137,7 @@ OPTIMIZER_NAME="Adam"
 CRITERION_NAME="CrossEntropyLoss"
 DEVICE=0
 CEILING_BATCHSIZE=1000
-TEMPSAMPLE_PATH="./Data/cifar_testsample.pt"
+TEMPSAMPLE_PATH= "Data/cifar_testsample.pt"
 
 ########################################################################################################################
 
