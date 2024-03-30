@@ -308,7 +308,7 @@ class FastSpeed:
                         'partition_list': partition_list
                     }
 
-                sampler = Distributed_Elastic_Sampler(dataset=dataset, partition_strategy=sampler_dict)
+                sampler = Distributed_Elastic_Sampler(dataset=dataset,shuffle=True, partition_strategy=sampler_dict)
                 train_loader = DataLoader(dataset=dataset,
                                           batch_size=batchsize_list[self.dist_args.global_rank],
                                           shuffle=False,  # 这个值必须设置为false，否则会导致多个节点可能都抽到同一个样例的结果
@@ -350,8 +350,9 @@ class FastSpeed:
                 iter_loss = 0.0
                 iters_loss = 0.0
                 epoch_loss = 0.0
-                train_iter = iter(train_loader)
+
                 train_loader.sampler.set_epoch(epoch)
+                train_iter = iter(train_loader)
 
                 for iter_number in tqdm(range(self.max_epoch_iter)):
 
