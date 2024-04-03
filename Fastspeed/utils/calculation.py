@@ -95,10 +95,15 @@ def calculate_memmory(model,
     after_memory = torch.cuda.max_memory_allocated(device)
     return after_memory - before_memory
 
-def calculate_param(model,shape):
+
+
+def cnnCalculateParam(model,shape):
     dummy_input = torch.normal(0, 1, size=shape)
     flops, params = profile(model, inputs=(dummy_input,))
-    return flops,params
+    return flops*2 , params
+
+
+
 
 
 '''

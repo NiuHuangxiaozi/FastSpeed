@@ -29,7 +29,7 @@ def load_data(jsonl_file_path) -> pd.DataFrame:
 
 def split_data(df) -> List[pd.DataFrame]:
     np.random.seed(112)
-    df_train, df_val, df_test = np.split(df.sample(frac=1, random_state=42), [int(.90 * len(df)), int(.99 * len(df))])
+    df_train, df_val, df_test = np.split(df.sample(frac=1, random_state=42), [int(.98 * len(df)), int(.99 * len(df))])
     print(len(df_train), len(df_val), len(df_test))
     return df_train, df_val, df_test
 

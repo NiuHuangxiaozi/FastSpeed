@@ -1,17 +1,19 @@
 # official lib
-
-import torch
-from torch.distributed import init_process_group, destroy_process_group
 import os
 import argparse
+import torch
+from torch.distributed import init_process_group, destroy_process_group
 from argparse import Namespace
 from transformers import BertTokenizer
+import json
 
 # my lib
 from Fastspeed.utils.utilstool import Params
 from Fastspeed.utils.fastspeed import FastSpeed
 from load_data import load_data,split_data,EmotionDataset
 from model import BertClassifier
+from calculationCost import transformerCalculationCost
+
 def Get_args():
     parser = argparse.ArgumentParser(description='Alexnet train on cifar10.')
     parser.add_argument('--json_path', default="./args.json", help="args.json file path")
@@ -36,19 +38,24 @@ def main():
     args = Get_args()
     param = Params(args.json_path)
     if args.local_rank == 0:
-        print("The config is :", vars(param))
+        print("The config is :", json.dumps(vars(param), indent=4))
     Task(args,param)
     print("RANK :", args.global_rank, "All Finished")
     Distributed_destroy()
+
+
 
 
 def Task(
         args:Namespace,
         param:Params
          ):
+    #加载数据
     print("Begin to load data.")
     DATA_PATH="Data/data.jsonl"
     TOKENIZER_PATH="./Config/"
+    MODELCONFIG_PATH="./Config/config.json"
+
 
     df = load_data(DATA_PATH)
     df_train, df_val, df_test = split_data(df)
@@ -75,13 +82,27 @@ def Task(
         print("The model's total parameter is ",train_platform.get_parameter(task_model))
         print('In task on this node, we use {} gpus!'.format(torch.cuda.device_count()))
 
+    #计算单一sample需要的浮点数运算次数
+    CalculationQuantity=transformerCalculationCost(MODELCONFIG_PATH,512)
     #加载模型，开始训练
     wrapped_model = train_platform.model_wrap(task_model)
-    trained_model,epoch_loss_list=train_platform.train(train_loader=train_loader,
-                                                wrapped_model=wrapped_model)
+    trained_model,epoch_loss_list,timeCost,throughput,totalThroughput=train_platform.train(train_loader=train_loader,wrapped_model=wrapped_model)
 
-    print("epoch_loss_list is",epoch_loss_list)
+    print(
+        f"[GLOBAL_RANK:{args.global_rank}]  [Epoch_loss_list:{epoch_loss_list}]   [TimeCost:{timeCost}s]"
+        f"[Throughput:{throughput} sample/s] [TFLOPS: {(throughput * CalculationQuantity) /1e12}]")
+    print(
+        f"Fastspeed Total statistics [Throughput:{totalThroughput} sample/s] [TFLOPS per GPU: {(totalThroughput * CalculationQuantity) / (args.world_size*1e12)}]")
+
     print('Global Rank %d finished training' % (args.global_rank))
+
+
+
+
+
+
+
+
 
 # /////////////////////////////////////////////////////////////////
 if __name__ == '__main__':

@@ -6,10 +6,8 @@ import sys
 sys.path.append('C:\\D\\Lesson\\Final_Design\\')
 import torch.nn as nn
 import torch.optim as optim
-from thop import profile
+from thop import profile,clever_format
 
-# my party
-from Fastspeed.Test.MaxBatchsize_Search_Newshell.model import AlexNet
 
 ########################################################################################################################
 # the codes are going to be tested
@@ -66,10 +64,10 @@ def calculate_memmory(model,
     return after_memory - before_memory
 
 
-def calculate_param(model,shape):
+def cnnCalculateParam(model,shape):
     dummy_input = torch.normal(0, 1, size=shape)
     flops, params = profile(model, inputs=(dummy_input,))
-    return flops,params
+    return flops*2 , params
 
 ########################################################################################################################
 
@@ -145,26 +143,65 @@ class testSelfAttention(torch.nn.Module):
         self.transformer=nn.Transformer(d_model=512, batch_first=True)
     def forward(self,x):
         return self.transformer(x,x)
+        
+class AlexNet(nn.Module):
+    def __init__(self, num_classes=1000):
+        super(AlexNet, self).__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+            nn.Conv2d(64, 192, kernel_size=5, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+            nn.Conv2d(192, 384, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(384, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
+        self.classifier = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(256 * 6 * 6, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, 4096),
+            nn.ReLU(inplace=True),
+            nn.Linear(4096, num_classes),
+        )
 
+    def forward(self, x):
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
 
 '''
 这个有许多的计算计算复杂度的库，包括：pytorchstat，ptflops，thop,在github上的star比较多，这里选用thop.
-这里发现，使用上面的ptflops和thop统计transformer时不一样，可能时他们计算的方式不同吧。
+这里发现，使用上面的ptflops和thop统计transformer时不一样，可能是他们计算的方式不同吧。
 '''
 def test3():
     #统计线性层
     model1=testLinear()
-    print("profile计算：线性层的计算量和参数量为：",calculate_param(model1,(1,15)))
+    print("profile计算：线性层的计算量和参数量为：",cnnCalculateParam(model1,(1,15)))
     print("手动计算：线性层的参数量为：",get_parameter_number(model1))
 
     #统计卷积层
     model2 = testConv()
-    print("profile计算：卷积层的计算量和参数量为：", calculate_param(model2, (2,3,32,32)))
+    print("profile计算：卷积层的计算量和参数量为：", cnnCalculateParam(model2, (2,3,32,32)))
+    flops,params=cnnCalculateParam(model2, (2,3,32,32))
+    flops, params = clever_format([flops, params], '%.3f')
+    print(f"运算量：{flops}, 参数量：{params}")
+    
     print("手动计算：卷积层的参数量为：", get_parameter_number(model2))
 
     #统计transformer
     model3 = testSelfAttention()
-    print("profile计算：transformer的计算量和参数量为：", calculate_param(model3, (2, 3, 512)))
+    print("profile计算：transformer的计算量和参数量为：", cnnCalculateParam(model3, (2, 3, 512)))
     print("手动计算：transformer的参数量为：", get_parameter_number(model3))
 
 

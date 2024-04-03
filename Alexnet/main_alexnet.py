@@ -10,12 +10,17 @@ import torch.distributed as dist
 import torchvision
 import torch.optim as optim
 import torch.nn as nn
-from tqdm import  tqdm
+from tqdm import tqdm
 from torch.utils.data import DataLoader
+import copy
+import json
+
 
 # my lib
 from  Fastspeed.utils.utilstool import Params
 from Fastspeed.utils.fastspeed import FastSpeed
+
+from Fastspeed.utils.calculation import cnnCalculateParam
 from model import AlexNet
 ########################################################################################################################
 def Get_args():
@@ -42,7 +47,7 @@ def main():
     args = Get_args()
     param = Params(args.json_path)
     if args.local_rank == 0:
-        print("The config is :", vars(param))
+        print("The config is :", json.dumps(vars(param),indent=4))
     Task(args,param)
     print("RANK :", args.global_rank, "All Finished")
     Distributed_destroy()
@@ -81,8 +86,11 @@ def Task(
     train_dataset, test_dataset = get_dataset(args.local_rank, "/home/")
     input=train_dataset[0][0].unsqueeze(0)
     label=torch.LongTensor([train_dataset[0][1]])
-    # 定义模型
+
+    #定义模型
     task_model = AlexNet(10)
+
+    CalculationQuantity,_ = cnnCalculateParam(model=copy.deepcopy(task_model),shape = (1, 3, 449, 449))
 
 
     #定义异构训练平台
@@ -96,10 +104,17 @@ def Task(
 
     #加载模型，开始训练
     wrapped_model = train_platform.model_wrap(task_model)
-    trained_model,epoch_loss_list=train_platform.train(train_loader=train_loader,
+
+    trained_model,epoch_loss_list,timeCost,throughput,totalThroughput=train_platform.train(train_loader=train_loader,
                                                 wrapped_model=wrapped_model)
 
-    print("epoch_loss_list is", epoch_loss_list)
+
+
+    print(f"[GLOBAL_RANK:{args.global_rank}]  [Epoch_loss_list:{epoch_loss_list}]   [TimeCost:{timeCost} s]"
+          f"   [Throughput:{throughput} sample/s] [TFLOPS: {(throughput*CalculationQuantity)/(1e12)}]")
+    print(f"Fastspeed Total statistics [Throughput:{totalThroughput} sample/s] "
+          f"[TFLOPS per gpu: {(totalThroughput*CalculationQuantity)/(args.world_size*1e12)}]")
+
     print('Global Rank %d finished training' % (args.global_rank))
     ###################################################################################################################
     test_dataloader = DataLoader(dataset=test_dataset,

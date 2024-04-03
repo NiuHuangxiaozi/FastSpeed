@@ -64,6 +64,9 @@ class FastSpeed:
         PATH = "./Fastspeed/Temp/" + self.config.strategy["model_name"] + "_testsample.pt"
         torch.save(InputLabel, PATH)
 
+        self.partition_split=None
+        self.batchsize_split=None
+
     '''
     model_wrap:构建我们需要训练的模型
     '''
@@ -269,18 +272,20 @@ class FastSpeed:
                     partition_list = (TotalDataNumber * temp_portion).astype(int)
                     partition_list[-1] = TotalDataNumber - np.sum(partition_list[:-1])
 
-                    partition_list = partition_list.astype(int).tolist()
-                    batchsize_list = batchsize_list.astype(int).tolist()
+
+
+                    self.partition_split = partition_list.astype(int).tolist()
+                    self.batchsize_split = batchsize_list.astype(int).tolist()
                 else:
                     print("This is manual partition mode!")
-                    partition_list, batchsize_list = self.config.strategy["manual_partition_list"] \
+                    self.partition_split, self.batchsize_split = self.config.strategy["manual_partition_list"] \
                         , self.config.strategy["manual_batchsize_list"]
                 ########################################################################################################
 
                 # 1
                 ########################################################################################################
                 # 统一每一个epoch的iter数，防止有些节点训练完毕，有些没有训练完毕
-                self.epoch_iters = np.ceil(np.divide(partition_list, batchsize_list)).astype(int)
+                self.epoch_iters = np.ceil(np.divide(self.partition_split, self.batchsize_split)).astype(int)
                 self.max_epoch_iter = max(self.epoch_iters)
                 ########################################################################################################
 
@@ -289,28 +294,28 @@ class FastSpeed:
                 global_rank_print(0, "epoch_iters is " + str(list(self.epoch_iters)))
                 global_rank_print(0, "max_epoch_iter is " + str(self.max_epoch_iter))
                 # for debug
-                global_rank_print(0, "The partition_list is : " + str(partition_list))
-                global_rank_print(0, "The batchsize_list is : " + str(batchsize_list))
+                global_rank_print(0, "The partition_split is : " + str(self.partition_split))
+                global_rank_print(0, "The batchsize_split is : " + str(self.batchsize_split))
                 # for debug
-                if partition_list is None or batchsize_list is None:
-                    raise MyException(0, "partition_list or batchsize_list can't be None in the manual mode!")
+                if self.partition_split is None or self.batchsize_split is None:
+                    raise MyException(0, "partition_split or batchsize_split can't be None in the manual mode!")
                 ########################################################################################################
 
                 # 3
                 ########################################################################################################
-                # 这里在计算完batchsize_list之后我们需要计算一下各个梯度的权重比例
+                # 这里在计算完batchsize_split之后我们需要计算一下各个梯度的权重比例
                 # 然后调用Distributed_Elastic_Sampler和相应的dataloader进行数据的划分
-                self.grad_portion = batchsize_list / np.sum(batchsize_list)
+                self.grad_portion = self.batchsize_split / np.sum(self.batchsize_split)
 
                 sampler_dict = \
                     {
                         'method': "uneven",
-                        'partition_list': partition_list
+                        'partition_list': self.partition_split
                     }
 
                 sampler = Distributed_Elastic_Sampler(dataset=dataset,shuffle=True, partition_strategy=sampler_dict)
                 train_loader = DataLoader(dataset=dataset,
-                                          batch_size=batchsize_list[self.dist_args.global_rank],
+                                          batch_size=self.batchsize_split[self.dist_args.global_rank],
                                           shuffle=False,  # 这个值必须设置为false，否则会导致多个节点可能都抽到同一个样例的结果
                                           sampler=sampler,
                                           pin_memory=self.config.data["train_loader_pin_memory"],
@@ -346,6 +351,10 @@ class FastSpeed:
             # 创建epoch_loss_list数组，用作以后的每一轮的loss的画图，比如折线图
             epoch_loss_list: List[float] = []
 
+
+            #开始计算时间
+            self.time_start()
+
             for epoch in range(Epoch):  # loop for many epochs
                 iter_loss = 0.0
                 iters_loss = 0.0
@@ -365,7 +374,7 @@ class FastSpeed:
                         # 开始真正的训练
                         data_input, data_label = to_device(data_input, device), to_device(data_label, device)
                         if iter_number == 0:  # tes whether the dataloader is right or not.
-                            print("The one input is ", data_input)
+                            print("The one label is ", data_label)
                         with self._model_with_sync(wrapped_model, iter_number, gradient_step):
                             # 前向传播
                             data_output = wrapped_model(data_input)
@@ -387,11 +396,11 @@ class FastSpeed:
                             iters_loss = 0.0
 
                     else:  # choose a dummy example to manipulate the iter of small number process.
-                        dummy_input = self.dummy_input.to(device)
-                        dummy_label = self.dummy_label.to(device)
+                        dummy_input = to_device(self.dummy_input,device)
+                        dummy_label = to_device(self.dummy_label,device)
 
                         if epoch == 0:  # tes whether the dataloader is right or not.
-                            print("The input shape is ", dummy_input.shape)
+                            print("The dummy input  is ", dummy_input)
 
                         with self._model_with_sync(wrapped_model, iter_number, gradient_step):
                             # 前向传播
@@ -413,7 +422,16 @@ class FastSpeed:
                     epoch_loss_list.append(epoch_loss)
                     epoch_loss = 0.0
 
-        return wrapped_model, epoch_loss_list
+            #结束计算时间
+            self.time_end()
+            #计算所用的时间
+            timeCost = self.running_time()
+            #计算吞吐量
+            throughput=(Epoch*self.partition_split[self.dist_args.global_rank])/timeCost
+            totalThroughout=(Epoch*self.config.data["total_datasize"])/timeCost
+
+
+        return wrapped_model, epoch_loss_list,timeCost,throughput,totalThroughout
 
     # 下面都是一些辅助的小函数
     ####################################################################################################################
@@ -435,17 +453,15 @@ class FastSpeed:
         trainable_num = sum(p.numel() for p in model.parameters() if p.requires_grad)
         return {'Total': total_num, 'Trainable': trainable_num}
 
-    def time_start(self, local_rank, target_local_rank):
-        if local_rank == target_local_rank:
+    def time_start(self):
             self.start_time = time.time()
 
-    def time_end(self, local_rank, target_local_rank):
-        if local_rank == target_local_rank:
+    def time_end(self):
             self.end_time = time.time()
 
-    def calculate_time(self, local_rank, target_local_rank):
-        if local_rank == target_local_rank:
+    def running_time(self):
             return self.end_time - self.start_time
+
 
     # 通过名字创建相应的优化器
     # 假定模型已经在gpu上了

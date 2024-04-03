@@ -2,14 +2,14 @@
   "data": {
     "total_datasize": 50000,
     "train_loader_pin_memory": 0,
-    "train_loader_num_workers": 4
+    "train_loader_num_workers": 2
   },
   "train":{
-      "epochs":15,
-      "batch_size": 100,
+      "epochs":2,
+      "batch_size": 1000,
       "iter_log_interval": 50,
       "epoch_log_interval": 1,
-      "gradient_accumulate_step":20,
+      "gradient_accumulate_step":1,
       "criterion": "CrossEntropy",
       "optimizer":"Adam",
       "learning_rate": 0.001
@@ -17,11 +17,11 @@
   "strategy": {
       "model_type": "ddp",
       "partition_type":  "autobalanced",
-      "manual_partition_list": [25000, 25000],
-      "manual_batchsize_list": [5, 5],
+      "manual_partition_list": [12500,12500,12500,12500],
+      "manual_batchsize_list": [250,250,250,250],
 
       "unbalanced_strategy": "time",
-      "test_batchsize_bytime":50,
+      "test_batchsize_bytime":500,
       "model_name": "AlexNet",
       "model_args": [10],
       "runing_dependency":["from model import * "]

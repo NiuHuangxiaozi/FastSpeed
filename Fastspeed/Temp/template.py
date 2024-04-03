@@ -93,6 +93,11 @@ class Test_max_batchsize:
         except RuntimeError as exception:
                 if "out of memory" in str(exception):
                         return 1
+                elif "GET was unable to find an engine to execute this computation" in str(exception):
+                        return 1
+                else:
+                        print(exception)
+                        sys.exit(1)
 
 
 import os
