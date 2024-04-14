@@ -1,0 +1,29 @@
+{
+  "data": {
+    "total_datasize": 903,
+    "train_loader_pin_memory": 0,
+    "train_loader_num_workers": 2
+  },
+  "train":{
+      "epochs":2,
+      "batch_size": 16,
+      "iter_log_interval": 50,
+      "epoch_log_interval": 1,
+      "gradient_accumulate_step":1,
+      "criterion": "CrossEntropy",
+      "optimizer":"Adam",
+      "learning_rate": 0.001
+  },
+  "strategy": {
+      "model_type": "ddp",
+      "partition_type":  "autobalanced",
+      "manual_partition_list": [450,453],
+      "manual_batchsize_list": [8,8],
+
+      "unbalanced_strategy": "time",
+      "test_batchsize_bytime":7,
+      "model_name": "T5base",
+      "model_args": ["./T5base_config"],
+      "runing_dependency":["from model import * "]
+  }
+}

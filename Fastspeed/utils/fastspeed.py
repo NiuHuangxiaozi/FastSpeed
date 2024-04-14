@@ -2,7 +2,6 @@
 from Fastspeed.utils.sampler import Distributed_Elastic_Sampler
 from Fastspeed.help.debug import global_rank_print
 from Fastspeed.utils.calculation import calculate_time
-from Fastspeed.utils.resource_detection import Test_MaxBatchsize
 from Fastspeed.utils.utilstool import Params, list2str, repalce_macro
 from argparse import Namespace
 from Fastspeed.utils.scheduling import batchsize_scheduling
@@ -38,7 +37,8 @@ class FastSpeed:
     def __init__(self, param_config: Params,
                  args: Namespace,
                  test_input,
-                 test_label) -> None:
+                 test_label,
+                 isModelOutputLoss=False) -> None:
         self.grad_portion: List[float] = None  # 对于数据并行不平衡的batch的normalize
         # 用来计算模型的运行时间并做一些分析
         self.start_time = 0.0
@@ -56,6 +56,8 @@ class FastSpeed:
         self.test_input = test_input
         self.test_label = test_label
 
+        #有些模型不老实，lossfunc都包括在模型里面了，所以加一个flag提示我不用自己求loss
+        self.isModelOutputLoss=isModelOutputLoss
         # 保存用于临时样例
         InputLabel = {
             "input": self.test_input,
@@ -170,7 +172,7 @@ class FastSpeed:
 
         device = self.dist_args.local_rank
         file_path = "./Fastspeed/Temp/template.py"
-        target_file_path = "./Fastspeed/Temp/instance.py"
+        target_file_path = f"./Fastspeed/Temp/instance_{self.dist_args.global_rank}.py"
         data = None
         dependency_list = self.config.strategy["runing_dependency"]
         macros = {
@@ -374,12 +376,20 @@ class FastSpeed:
                         # 开始真正的训练
                         data_input, data_label = to_device(data_input, device), to_device(data_label, device)
                         if iter_number == 0:  # tes whether the dataloader is right or not.
-                            print("The one label is ", data_label)
+                            print(f"The one label is [{data_label}](if is None means model otput is directly loss.)")
+
                         with self._model_with_sync(wrapped_model, iter_number, gradient_step):
                             # 前向传播
                             data_output = wrapped_model(data_input)
+
                             # 计算loss值
-                            iter_loss = criterion(data_output, data_label)
+                            #直接得到loss
+                            if self.isModelOutputLoss:
+                                iter_loss=data_output
+                            else:
+                                #输出不是loss需要进行loss的求解
+                                iter_loss = criterion(data_output, data_label)
+
                             (iter_loss * self.grad_portion[self.dist_args.global_rank]).backward()
 
                         if (iter_number + 1) % gradient_step == 0:
@@ -405,8 +415,13 @@ class FastSpeed:
                         with self._model_with_sync(wrapped_model, iter_number, gradient_step):
                             # 前向传播
                             dummy_output = wrapped_model(dummy_input)
+
                             # 计算loss值
-                            dummy_iter_loss = criterion(dummy_output, dummy_label)
+                            # 直接得到loss
+                            if self.isModelOutputLoss:
+                                dummy_iter_loss = dummy_output
+                            else:
+                                dummy_iter_loss = criterion(dummy_output, dummy_label)
 
                             dummy_iter_loss *= 0.0
                             dummy_iter_loss.backward()
