@@ -1,12 +1,12 @@
 {
   "data": {
-    "total_datasize": 4168,
+    "total_datasize": 50000,
     "train_loader_pin_memory": 0,
     "train_loader_num_workers": 2
   },
   "train":{
       "epochs":2,
-      "batch_size": 30,
+      "batch_size": 500,
       "iter_log_interval": 50,
       "epoch_log_interval": 1,
       "gradient_accumulate_step":1,
@@ -17,13 +17,13 @@
   "strategy": {
       "model_type": "ddp",
       "partition_type":  "manual",
-      "manual_partition_list": [2084,2084],
-      "manual_batchsize_list": [15,15],
+      "manual_partition_list": [50000],
+      "manual_batchsize_list": [500],
 
       "unbalanced_strategy": "time",
-      "test_batchsize_bytime":10,
-      "model_name": "BertClassifier",
-      "model_args": ["./Config"],
+      "test_batchsize_bytime":500,
+      "model_name": "vgg19",
+      "model_args": [10],
       "runing_dependency":["from model import * "]
   }
 }

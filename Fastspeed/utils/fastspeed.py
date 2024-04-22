@@ -225,6 +225,7 @@ class FastSpeed:
                     left = mid + 1
 
         assert(max_batchsize!=-1)
+        max_batchsize=max_batchsize-2
         print("The max batchsize is ", max_batchsize)
         # --------------------------------------------------------------------------------------------------------------
 
@@ -247,7 +248,7 @@ class FastSpeed:
         try:
             if self.config.data["total_datasize"] != len(dataset):
                 raise MyException \
-                    ("Error[Fastspeed,unbalanced_datasplit]:The  length of dataset dismatch with json file config.")
+                    (0,"Error[Fastspeed,unbalanced_datasplit]:The  length of dataset dismatch with json file config.")
         except MyException as e:
             print(e)
             sys.exit(1)

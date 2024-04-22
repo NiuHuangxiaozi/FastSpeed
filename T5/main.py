@@ -13,7 +13,7 @@ from Fastspeed.utils.utilstool import Params
 from Fastspeed.utils.fastspeed import FastSpeed
 
 from load_data import SummaryDataset
-from model import T5base,getT5calculationCost
+from model import T5,getT5calculationCost
 
 def Get_args():
     parser = argparse.ArgumentParser(description='Alexnet train on cifar10.')
@@ -106,10 +106,7 @@ def Task(
     print(f"target_ids_y {input['target_ids_y']}")
 
     # 定义模型
-    if args.modelType == "T5base":
-        task_model = T5base(args.configPath)
-    else:
-        assert (False)
+    task_model = T5(args.configPath)
 
     # 定义异构训练平台
     train_platform = FastSpeed(param, args, input, label,True)

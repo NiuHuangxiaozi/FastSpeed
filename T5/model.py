@@ -9,9 +9,9 @@ from transformers import T5Tokenizer, T5ForConditionalGeneration, AutoConfig
 
 
 
-class T5base(nn.Module):
+class T5(nn.Module):
     def __init__(self, config_path):
-        super(T5base, self).__init__()
+        super(T5, self).__init__()
         self.t5= T5ForConditionalGeneration.from_pretrained(config_path)
         self.tokenizer=T5Tokenizer.from_pretrained(config_path, legacy=False)
 
