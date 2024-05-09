@@ -12,7 +12,13 @@
       "gradient_accumulate_step":1,
       "criterion": "CrossEntropy",
       "optimizer":"Adam",
-      "learning_rate": 0.001
+      "learning_rate": 0.001,
+
+      "isLoadModel": 0,
+      "loadModelPath":"./checkpoint/Alexnet_10.pth",
+      "saveModel": 1,
+      "checkpoint_interval": 5,
+      "checkpoint_folder": "./checkpoint"
   },
   "strategy": {
       "model_type": "ddp",

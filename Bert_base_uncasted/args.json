@@ -1,24 +1,30 @@
 {
   "data": {
-    "total_datasize": 4168,
+    "total_datasize": 16000	,
     "train_loader_pin_memory": 0,
     "train_loader_num_workers": 2
   },
   "train":{
-      "epochs":2,
-      "batch_size": 30,
+      "epochs":10,
+      "batch_size": 64,
       "iter_log_interval": 50,
       "epoch_log_interval": 1,
       "gradient_accumulate_step":1,
       "criterion": "CrossEntropy",
       "optimizer":"Adam",
-      "learning_rate": 0.001
+      "learning_rate": 2e-5,
+
+      "isLoadModel": 0,
+      "loadModelPath":"./checkpoint/Alexnet_10.pth",
+      "saveModel": 1,
+      "checkpoint_interval": 1,
+      "checkpoint_folder": "./Bert_homo_small_checkpoint"
   },
   "strategy": {
       "model_type": "ddp",
       "partition_type":  "manual",
-      "manual_partition_list": [2084,2084],
-      "manual_batchsize_list": [15,15],
+      "manual_partition_list": [8000,8000],
+      "manual_batchsize_list": [32,32],
 
       "unbalanced_strategy": "time",
       "test_batchsize_bytime":10,

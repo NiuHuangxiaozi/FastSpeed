@@ -342,12 +342,32 @@ class FastSpeed:
         if m_type == "ddp":
             # 准备训练所需要的基本构建
             Epoch = self.config.train["epochs"]
+
             criterion = self._get_criterion(self.config.train["criterion"])
-            optimizer = self._get_optim(self.config.train["optimizer"], wrapped_model)
+
             device = self.dist_args.local_rank
+
             gradient_step = self.config.train["gradient_accumulate_step"]
             iter_log = self.config.train["iter_log_interval"]
             epoch_log = self.config.train["epoch_log_interval"]
+
+            checkInterval=self.config.train["checkpoint_interval"]
+
+            saveModel=self.config.train["saveModel"]
+
+            if self.config.train["isLoadModel"]==1:
+                modelPath=self.config.train["loadModelPath"]
+
+                preEpoch=torch.load(modelPath)['epoch']
+
+                wrapped_model.module.load_state_dict(torch.load(modelPath)['model'])
+
+                optimizer = self._get_optim(self.config.train["optimizer"], wrapped_model)
+                optimizer.load_state_dict(torch.load(modelPath)['optimizer'])
+
+            else:
+                preEpoch = 0
+                optimizer = self._get_optim(self.config.train["optimizer"], wrapped_model)
 
             # 模型进入训练状态
             wrapped_model.train()
@@ -437,6 +457,28 @@ class FastSpeed:
 
                     epoch_loss_list.append(epoch_loss)
                     epoch_loss = 0.0
+
+                #模型的保存
+                if saveModel and epoch % checkInterval== (checkInterval - 1):
+                    folder_path=self.config.train["checkpoint_folder"]
+
+                    if self.dist_args.local_rank==0:
+                        if not os.path.exists(folder_path):
+                            # 文件夹不存在，创建文件夹
+                            os.makedirs(folder_path)
+                            print(f"文件夹已创建：{folder_path}")
+                    else:
+                        dist.barrier()
+
+                    if self.dist_args.local_rank==0:
+                        dist.barrier()
+
+                    #来自 https://blog.csdn.net/hustwayne/article/details/120324639
+                    trainState = {'epoch': preEpoch+epoch,
+                             'model': wrapped_model.module.state_dict(),
+                             'optimizer': optimizer.state_dict()
+                             }
+                    torch.save(trainState, f"{folder_path}/{self.config.strategy['model_name']}_DDP_Epoch{preEpoch+epoch}.pth")
 
             #结束计算时间
             self.time_end()

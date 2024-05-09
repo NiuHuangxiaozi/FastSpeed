@@ -22,7 +22,7 @@ def matrix_multiply(device, size=2048, duration=3600):
 if __name__ == '__main__':
     from threading import Thread
     device=[0,1]
-    maxtrix_size=[512,10240]
+    maxtrix_size=[512,512]
     threads=[]
     for device_index in range(len(device)):
         # 使用多线程在多个GPU上并行加载任务

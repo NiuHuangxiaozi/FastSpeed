@@ -24,7 +24,7 @@ from Fastspeed.utils.calculation import cnnCalculateParam
 from model import vgg19
 ########################################################################################################################
 def Get_args():
-    parser = argparse.ArgumentParser(description='Alexnet train on cifar10.')
+    parser = argparse.ArgumentParser(description='vgg19 train on cifar10.')
     parser.add_argument('--json_path', default="./args.json", help="args.json file path")
     parser.add_argument('--local_rank', default=-1, type=int, help='Local rank always refer to specific gpu.')
     parser.add_argument('--global_rank', default=-1, type=int, help='Global Rank.')
@@ -55,8 +55,8 @@ def main():
 def get_dataset(local_rank, dl_path):
     #图片的数据处理
     transform = transforms.Compose([
-        transforms.Resize(512),
-        transforms.CenterCrop(449),
+        transforms.Resize(40),
+        transforms.CenterCrop(32),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),])
     #保证所有的进程都到这一步
@@ -83,7 +83,7 @@ def Task(
         param:Params
          ):
     #获取数据集和用于负载均衡的小样例
-    train_dataset, test_dataset = get_dataset(args.local_rank, "/home/ainet/wsj/vgg19/")
+    train_dataset, test_dataset = get_dataset(args.local_rank, "/home/")
     input=train_dataset[0][0].unsqueeze(0)
     label=torch.LongTensor([train_dataset[0][1]])
 

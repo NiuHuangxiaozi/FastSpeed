@@ -6,19 +6,25 @@
   },
   "train":{
       "epochs":2,
-      "batch_size": 500,
+      "batch_size": 24,
       "iter_log_interval": 50,
       "epoch_log_interval": 1,
       "gradient_accumulate_step":1,
       "criterion": "CrossEntropy",
       "optimizer":"Adam",
-      "learning_rate": 0.001
+      "learning_rate": 0.001,
+
+      "isLoadModel": 0,
+      "loadModelPath":"./checkpoint/Alexnet_10.pth",
+      "saveModel": 0,
+      "checkpoint_interval": 5,
+      "checkpoint_folder": "./checkpoint"
   },
   "strategy": {
       "model_type": "ddp",
       "partition_type":  "manual",
-      "manual_partition_list": [50000],
-      "manual_batchsize_list": [500],
+      "manual_partition_list": [12500,12500],
+      "manual_batchsize_list": [12,12],
 
       "unbalanced_strategy": "time",
       "test_batchsize_bytime":500,
