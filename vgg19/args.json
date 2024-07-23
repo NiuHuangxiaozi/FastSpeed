@@ -1,0 +1,35 @@
+{
+  "data": {
+    "total_datasize": 50000,
+    "train_loader_pin_memory": 0,
+    "train_loader_num_workers": 2
+  },
+  "train":{
+      "epochs":2,
+      "batch_size": 24,
+      "iter_log_interval": 50,
+      "epoch_log_interval": 1,
+      "gradient_accumulate_step":1,
+      "criterion": "CrossEntropy",
+      "optimizer":"Adam",
+      "learning_rate": 0.001,
+
+      "isLoadModel": 0,
+      "loadModelPath":"./checkpoint/Alexnet_10.pth",
+      "saveModel": 0,
+      "checkpoint_interval": 5,
+      "checkpoint_folder": "./checkpoint"
+  },
+  "strategy": {
+      "model_type": "ddp",
+      "partition_type":  "manual",
+      "manual_partition_list": [12500,12500],
+      "manual_batchsize_list": [12,12],
+
+      "unbalanced_strategy": "time",
+      "test_batchsize_bytime":500,
+      "model_name": "vgg19",
+      "model_args": [10],
+      "runing_dependency":["from model import * "]
+  }
+}

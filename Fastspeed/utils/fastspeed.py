@@ -2,7 +2,6 @@
 from Fastspeed.utils.sampler import Distributed_Elastic_Sampler
 from Fastspeed.help.debug import global_rank_print
 from Fastspeed.utils.calculation import calculate_time
-from Fastspeed.utils.resource_detection import Test_MaxBatchsize
 from Fastspeed.utils.utilstool import Params, list2str, repalce_macro
 from argparse import Namespace
 from Fastspeed.utils.scheduling import batchsize_scheduling
@@ -38,7 +37,8 @@ class FastSpeed:
     def __init__(self, param_config: Params,
                  args: Namespace,
                  test_input,
-                 test_label) -> None:
+                 test_label,
+                 isModelOutputLoss=False) -> None:
         self.grad_portion: List[float] = None  # 对于数据并行不平衡的batch的normalize
         # 用来计算模型的运行时间并做一些分析
         self.start_time = 0.0
@@ -56,6 +56,8 @@ class FastSpeed:
         self.test_input = test_input
         self.test_label = test_label
 
+        #有些模型不老实，lossfunc都包括在模型里面了，所以加一个flag提示我不用自己求loss
+        self.isModelOutputLoss=isModelOutputLoss
         # 保存用于临时样例
         InputLabel = {
             "input": self.test_input,
@@ -63,6 +65,9 @@ class FastSpeed:
         }
         PATH = "./Fastspeed/Temp/" + self.config.strategy["model_name"] + "_testsample.pt"
         torch.save(InputLabel, PATH)
+
+        self.partition_split=None
+        self.batchsize_split=None
 
     '''
     model_wrap:构建我们需要训练的模型
@@ -167,7 +172,7 @@ class FastSpeed:
 
         device = self.dist_args.local_rank
         file_path = "./Fastspeed/Temp/template.py"
-        target_file_path = "./Fastspeed/Temp/instance.py"
+        target_file_path = f"./Fastspeed/Temp/instance_{self.dist_args.global_rank}.py"
         data = None
         dependency_list = self.config.strategy["runing_dependency"]
         macros = {
@@ -220,6 +225,7 @@ class FastSpeed:
                     left = mid + 1
 
         assert(max_batchsize!=-1)
+        max_batchsize=max_batchsize-2
         print("The max batchsize is ", max_batchsize)
         # --------------------------------------------------------------------------------------------------------------
 
@@ -242,7 +248,7 @@ class FastSpeed:
         try:
             if self.config.data["total_datasize"] != len(dataset):
                 raise MyException \
-                    ("Error[Fastspeed,unbalanced_datasplit]:The  length of dataset dismatch with json file config.")
+                    (0,"Error[Fastspeed,unbalanced_datasplit]:The  length of dataset dismatch with json file config.")
         except MyException as e:
             print(e)
             sys.exit(1)
@@ -269,18 +275,20 @@ class FastSpeed:
                     partition_list = (TotalDataNumber * temp_portion).astype(int)
                     partition_list[-1] = TotalDataNumber - np.sum(partition_list[:-1])
 
-                    partition_list = partition_list.astype(int).tolist()
-                    batchsize_list = batchsize_list.astype(int).tolist()
+
+
+                    self.partition_split = partition_list.astype(int).tolist()
+                    self.batchsize_split = batchsize_list.astype(int).tolist()
                 else:
                     print("This is manual partition mode!")
-                    partition_list, batchsize_list = self.config.strategy["manual_partition_list"] \
+                    self.partition_split, self.batchsize_split = self.config.strategy["manual_partition_list"] \
                         , self.config.strategy["manual_batchsize_list"]
                 ########################################################################################################
 
                 # 1
                 ########################################################################################################
                 # 统一每一个epoch的iter数，防止有些节点训练完毕，有些没有训练完毕
-                self.epoch_iters = np.ceil(np.divide(partition_list, batchsize_list)).astype(int)
+                self.epoch_iters = np.ceil(np.divide(self.partition_split, self.batchsize_split)).astype(int)
                 self.max_epoch_iter = max(self.epoch_iters)
                 ########################################################################################################
 
@@ -289,28 +297,28 @@ class FastSpeed:
                 global_rank_print(0, "epoch_iters is " + str(list(self.epoch_iters)))
                 global_rank_print(0, "max_epoch_iter is " + str(self.max_epoch_iter))
                 # for debug
-                global_rank_print(0, "The partition_list is : " + str(partition_list))
-                global_rank_print(0, "The batchsize_list is : " + str(batchsize_list))
+                global_rank_print(0, "The partition_split is : " + str(self.partition_split))
+                global_rank_print(0, "The batchsize_split is : " + str(self.batchsize_split))
                 # for debug
-                if partition_list is None or batchsize_list is None:
-                    raise MyException(0, "partition_list or batchsize_list can't be None in the manual mode!")
+                if self.partition_split is None or self.batchsize_split is None:
+                    raise MyException(0, "partition_split or batchsize_split can't be None in the manual mode!")
                 ########################################################################################################
 
                 # 3
                 ########################################################################################################
-                # 这里在计算完batchsize_list之后我们需要计算一下各个梯度的权重比例
+                # 这里在计算完batchsize_split之后我们需要计算一下各个梯度的权重比例
                 # 然后调用Distributed_Elastic_Sampler和相应的dataloader进行数据的划分
-                self.grad_portion = batchsize_list / np.sum(batchsize_list)
+                self.grad_portion = self.batchsize_split / np.sum(self.batchsize_split)
 
                 sampler_dict = \
                     {
                         'method': "uneven",
-                        'partition_list': partition_list
+                        'partition_list': self.partition_split
                     }
 
-                sampler = Distributed_Elastic_Sampler(dataset=dataset, partition_strategy=sampler_dict)
+                sampler = Distributed_Elastic_Sampler(dataset=dataset,shuffle=True, partition_strategy=sampler_dict)
                 train_loader = DataLoader(dataset=dataset,
-                                          batch_size=batchsize_list[self.dist_args.global_rank],
+                                          batch_size=self.batchsize_split[self.dist_args.global_rank],
                                           shuffle=False,  # 这个值必须设置为false，否则会导致多个节点可能都抽到同一个样例的结果
                                           sampler=sampler,
                                           pin_memory=self.config.data["train_loader_pin_memory"],
@@ -334,24 +342,49 @@ class FastSpeed:
         if m_type == "ddp":
             # 准备训练所需要的基本构建
             Epoch = self.config.train["epochs"]
+
             criterion = self._get_criterion(self.config.train["criterion"])
-            optimizer = self._get_optim(self.config.train["optimizer"], wrapped_model)
+
             device = self.dist_args.local_rank
+
             gradient_step = self.config.train["gradient_accumulate_step"]
             iter_log = self.config.train["iter_log_interval"]
             epoch_log = self.config.train["epoch_log_interval"]
+
+            checkInterval=self.config.train["checkpoint_interval"]
+
+            saveModel=self.config.train["saveModel"]
+
+            if self.config.train["isLoadModel"]==1:
+                modelPath=self.config.train["loadModelPath"]
+
+                preEpoch=torch.load(modelPath)['epoch']
+
+                wrapped_model.module.load_state_dict(torch.load(modelPath)['model'])
+
+                optimizer = self._get_optim(self.config.train["optimizer"], wrapped_model)
+                optimizer.load_state_dict(torch.load(modelPath)['optimizer'])
+
+            else:
+                preEpoch = 0
+                optimizer = self._get_optim(self.config.train["optimizer"], wrapped_model)
 
             # 模型进入训练状态
             wrapped_model.train()
             # 创建epoch_loss_list数组，用作以后的每一轮的loss的画图，比如折线图
             epoch_loss_list: List[float] = []
 
+
+            #开始计算时间
+            self.time_start()
+
             for epoch in range(Epoch):  # loop for many epochs
                 iter_loss = 0.0
                 iters_loss = 0.0
                 epoch_loss = 0.0
-                train_iter = iter(train_loader)
+
                 train_loader.sampler.set_epoch(epoch)
+                train_iter = iter(train_loader)
 
                 for iter_number in tqdm(range(self.max_epoch_iter)):
 
@@ -364,12 +397,20 @@ class FastSpeed:
                         # 开始真正的训练
                         data_input, data_label = to_device(data_input, device), to_device(data_label, device)
                         if iter_number == 0:  # tes whether the dataloader is right or not.
-                            print("The one input is ", data_input)
+                            print(f"The one label is [{data_label}](if is None means model otput is directly loss.)")
+
                         with self._model_with_sync(wrapped_model, iter_number, gradient_step):
                             # 前向传播
                             data_output = wrapped_model(data_input)
+
                             # 计算loss值
-                            iter_loss = criterion(data_output, data_label)
+                            #直接得到loss
+                            if self.isModelOutputLoss:
+                                iter_loss=data_output
+                            else:
+                                #输出不是loss需要进行loss的求解
+                                iter_loss = criterion(data_output, data_label)
+
                             (iter_loss * self.grad_portion[self.dist_args.global_rank]).backward()
 
                         if (iter_number + 1) % gradient_step == 0:
@@ -386,17 +427,22 @@ class FastSpeed:
                             iters_loss = 0.0
 
                     else:  # choose a dummy example to manipulate the iter of small number process.
-                        dummy_input = self.dummy_input.to(device)
-                        dummy_label = self.dummy_label.to(device)
+                        dummy_input = to_device(self.dummy_input,device)
+                        dummy_label = to_device(self.dummy_label,device)
 
                         if epoch == 0:  # tes whether the dataloader is right or not.
-                            print("The input shape is ", dummy_input.shape)
+                            print("The dummy input  is ", dummy_input)
 
                         with self._model_with_sync(wrapped_model, iter_number, gradient_step):
                             # 前向传播
                             dummy_output = wrapped_model(dummy_input)
+
                             # 计算loss值
-                            dummy_iter_loss = criterion(dummy_output, dummy_label)
+                            # 直接得到loss
+                            if self.isModelOutputLoss:
+                                dummy_iter_loss = dummy_output
+                            else:
+                                dummy_iter_loss = criterion(dummy_output, dummy_label)
 
                             dummy_iter_loss *= 0.0
                             dummy_iter_loss.backward()
@@ -412,7 +458,38 @@ class FastSpeed:
                     epoch_loss_list.append(epoch_loss)
                     epoch_loss = 0.0
 
-        return wrapped_model, epoch_loss_list
+                #模型的保存
+                if saveModel and epoch % checkInterval== (checkInterval - 1):
+                    folder_path=self.config.train["checkpoint_folder"]
+
+                    if self.dist_args.local_rank==0:
+                        if not os.path.exists(folder_path):
+                            # 文件夹不存在，创建文件夹
+                            os.makedirs(folder_path)
+                            print(f"文件夹已创建：{folder_path}")
+                    else:
+                        dist.barrier()
+
+                    if self.dist_args.local_rank==0:
+                        dist.barrier()
+
+                    #来自 https://blog.csdn.net/hustwayne/article/details/120324639
+                    trainState = {'epoch': preEpoch+epoch,
+                             'model': wrapped_model.module.state_dict(),
+                             'optimizer': optimizer.state_dict()
+                             }
+                    torch.save(trainState, f"{folder_path}/{self.config.strategy['model_name']}_DDP_Epoch{preEpoch+epoch}.pth")
+
+            #结束计算时间
+            self.time_end()
+            #计算所用的时间
+            timeCost = self.running_time()
+            #计算吞吐量
+            throughput=(Epoch*self.partition_split[self.dist_args.global_rank])/timeCost
+            totalThroughout=(Epoch*self.config.data["total_datasize"])/timeCost
+
+
+        return wrapped_model, epoch_loss_list,timeCost,throughput,totalThroughout
 
     # 下面都是一些辅助的小函数
     ####################################################################################################################
@@ -434,17 +511,15 @@ class FastSpeed:
         trainable_num = sum(p.numel() for p in model.parameters() if p.requires_grad)
         return {'Total': total_num, 'Trainable': trainable_num}
 
-    def time_start(self, local_rank, target_local_rank):
-        if local_rank == target_local_rank:
+    def time_start(self):
             self.start_time = time.time()
 
-    def time_end(self, local_rank, target_local_rank):
-        if local_rank == target_local_rank:
+    def time_end(self):
             self.end_time = time.time()
 
-    def calculate_time(self, local_rank, target_local_rank):
-        if local_rank == target_local_rank:
+    def running_time(self):
             return self.end_time - self.start_time
+
 
     # 通过名字创建相应的优化器
     # 假定模型已经在gpu上了

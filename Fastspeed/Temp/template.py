@@ -54,15 +54,17 @@ class Test_max_batchsize:
                 raise  TypeError("self.input must be torch.Tensor or a torch.Tensor dict!")
 
             #label
-            if isinstance(self.label, torch.Tensor):
-                 batchsized_label=copy.deepcopy(self.label).repeat(self._repeat_size(self.label.shape,batchsize)).to(self.device)
+            if isinstance(self.label,dict) and len(self.label)==0:
+                batchsized_label = None
             else:
-                raise TypeError("self.label must be torch.Tensor type!")
+                if isinstance(self.label, torch.Tensor):
+                     batchsized_label=copy.deepcopy(self.label).repeat(self._repeat_size(self.label.shape,batchsize)).to(self.device)
+                else:
+                    raise TypeError("self.label must be torch.Tensor type!")
 
         except TypeError as e:
             print(e)
             sys.exit(1)
-
 
         try:
             gpu_model = self.model.to(self.device)
@@ -73,14 +75,16 @@ class Test_max_batchsize:
                 # 前向传播
                 output = gpu_model(batchsized_input)
                 # 计算损失
-                batch_loss = criterion(output,batchsized_label)
+                if batchsized_label==None:
+                    batch_loss=output
+                else:
+                    batch_loss = criterion(output,batchsized_label)
                 # 清除梯度
                 optimizer.zero_grad()
                 # 后向传播
                 batch_loss.backward()
                 # 梯度更新
                 optimizer.step()
-
             #归还显存
             del gpu_model
             del optimizer
@@ -93,6 +97,14 @@ class Test_max_batchsize:
         except RuntimeError as exception:
                 if "out of memory" in str(exception):
                         return 1
+                elif "GET was unable to find an engine to execute this computation" in str(exception):
+                        return 1
+                else:
+                        print(exception)
+                        sys.exit(1)
+        except Exception as e:
+            print(e)
+            sys.exit(1)
 
 
 import os
@@ -128,7 +140,6 @@ def main():
 
     test_platform.setInputData(one_input)
     test_platform.setLabel(one_label)
-
     flag = test_platform.is_oom(CEILING_BATCHSIZE)
     print(flag)
 

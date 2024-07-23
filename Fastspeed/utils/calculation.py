@@ -14,7 +14,7 @@ from Fastspeed.utils.utilstool import to_cpu,to_device,repeat_obj
 
 
 
-__all__ = ["calculate_time", "calculate_memmory","calculate_param"]
+__all__ = ["calculate_time", "calculate_memmory","cnnCalculateParam"]
 def Get_LossFunction(name:str):
     if name=='CrossEntropy':
         return nn.CrossEntropyLoss()
@@ -39,7 +39,11 @@ def calculate_time(model,criterion_name:str,device,input,label,test_batchsize:in
         torch.cuda.synchronize()
         start = time.time()
         result=model(temp_tensor)
-        loss = criterion(result, result - 1e-4)
+        if isinstance(temp_label,dict) and len(temp_label)==0:
+            loss=result
+        else:
+            loss = criterion(result, result - 1e-4)
+
         loss.backward()
         torch.cuda.synchronize()
         end = time.time()
@@ -95,10 +99,15 @@ def calculate_memmory(model,
     after_memory = torch.cuda.max_memory_allocated(device)
     return after_memory - before_memory
 
-def calculate_param(model,shape):
+
+
+def cnnCalculateParam(model,shape):
     dummy_input = torch.normal(0, 1, size=shape)
     flops, params = profile(model, inputs=(dummy_input,))
-    return flops,params
+    return flops*2 , params
+
+
+
 
 
 '''

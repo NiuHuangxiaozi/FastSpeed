@@ -28,6 +28,7 @@ def to_cpu(obj):
 
 
 def to_device(obj,device:int):
+    ########################################
     if isinstance(obj, dict):
         for key in obj:
             obj[key]=obj[key].to(device)
