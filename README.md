@@ -1,5 +1,34 @@
-# Fastspeed
-This repository is about design a system about unbalanced GPU training using pytorch.
-Process:
+------
+<div>
+    <h3 align="center">Fastspeed: The fast way to train on Heterogeneous GPU clusters</h3>
+</div>
+------
 
-On March 7th, 2024 ,I focus on the total_batchsize division and finally complete this part successfully on 2 gpus of different nodes. and Next I will deal with some numel problem carried with partition.
+
+
+# 1. Introduction
+
+------
+
+Fastspeed is a platform based on PyTorch that accelerates model training on heterogeneous GPU clusters. The platform automatically assigns varying amounts of training data to different types of GPUs. This load balancing strategy allows more powerful GPUs to process more data examples, reducing communication overhead and ultimately improving training speed.
+
+
+
+
+
+# 2. New
+
+------
+
+
+
+# 3. File Layout
+
+------
+
+
+
+
+
+
+
