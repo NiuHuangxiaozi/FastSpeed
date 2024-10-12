@@ -16,6 +16,7 @@ class Params():
                 params = json.load(f)
                 self.__dict__.update(params)
 
+
 def to_cpu(obj):
     if isinstance(obj, dict):
         for key in obj:
@@ -25,6 +26,7 @@ def to_cpu(obj):
     else:
         assert(False)
     return obj
+
 
 
 def to_device(obj,device:int):
@@ -67,11 +69,11 @@ def list2str(s:List[str])->str:
     return result
 
 
-
 def repalce_macro(data:str,d:dict)->str:
     for initial_value in d:
         data=data.replace(initial_value,d[initial_value])
     return data
+
 
 #utilstool.py内部使用的函数
 ########################################################################################################################

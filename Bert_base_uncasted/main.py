@@ -30,6 +30,7 @@ def Get_args():
 def Distributed_setup():
     init_process_group(backend="nccl")
     torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
+
 def Distributed_destroy():
     destroy_process_group()
 
